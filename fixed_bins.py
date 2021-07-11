@@ -1,6 +1,26 @@
 from imports import *
 from loading_data import *
+from loss_functions import *
 from general_plotting_and_model_prediction import *
+
+# >FIXME remove this function its already in a file -> gives error
+def get_pred(X_dataset, model_type, model):
+    '''Return predictions from model
+    note: X_dataset (Xo_prime) has taked observed and errors and generated many versions of the possible values based on observed value.
+          Its a nested list where sublists are of length 10'''
+    pred = []
+    if model_type == 'NN':
+        X_reshaped = X_dataset.reshape([len(X_dataset), 2]) 
+        pred = np.hstack(model.predict(X_reshaped)) 
+        # reshape back
+        pred = pred.reshape([len(X_dataset), 10, 2])
+    elif model_type == 'interpolate':
+        pred = [model(samplelst[:, 0], samplelst[:, 1]) for samplelst in X_dataset]  #evaluate positions log dust densities
+    elif model_type == 'bin':
+        n_bins = len(model)
+        pred = [[get_bin_value_of_pos(samplelst[i][0], samplelst[i][1], model, abs(BIN_X_MAX - BIN_X_MIN) / n_bins) for i in range(10)] for samplelst in X_dataset]
+    return np.array(pred)
+
 
 def get_bin_model(n_bins):
     '''Return bin values matrix'''

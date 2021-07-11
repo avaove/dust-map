@@ -1,4 +1,5 @@
 from loading_data import *
+
 # no error_bar
 # loss_lin: Return ||f(Xgrid) - Pgrid||**2
 # loss_asinh: Return ||arcsinh(f(Xgrid)) - arcsinh(Pgrid)||**2
@@ -51,3 +52,32 @@ def loss_asinh_er_np(y_true, y_pred):
         for j in range(10): # loop over diff versions of 1 X observation
             loss += np.divide(np.square(np.subtract(np.arcsinh(y_true[i]), np.arcsinh(y_pred[i][j]))), np.square(sigmasY[i]))
     return loss / len(y_true)
+
+def loss_lin_er_np(y_true, y_pred): # y_pred has shape (6000, 10) or (2000, 10) based on if we deal with training/testing/validation
+    loss = 0
+    sigmasY = get_Ye(y_true)
+    for i in range(len(y_pred)):
+        for j in range(10): # loop over diff versions of 1 X observation
+            loss += np.divide(np.square(np.subtract(y_true[i], y_pred[i][j])), np.square(sigmasY[i]))
+    return loss / len(y_true)
+
+def loss_asinh_er_np(y_true, y_pred):
+    loss = 0
+    sigmasY = get_Ye(y_true)
+    for i in range(len(y_pred)):
+        for j in range(10): # loop over diff versions of 1 X observation
+            loss += np.divide(np.square(np.subtract(np.arcsinh(y_true[i]), np.arcsinh(y_pred[i][j]))), np.square(sigmasY[i]))
+    return loss / len(y_true)
+
+def loss_lin_er_tf(y_true, y_pred):
+    loss = 0
+    sigmasY = get_Ye(y_true)
+    diff = tf.math.subtract(y_true, y_pred)
+    diff = tf.cast(diff, tf.float64)
+    return tf.reduce_mean(tf.math.divide(tf.square(diff), tf.square(sigmasY)))
+
+def loss_asinh_er_tf(y_true, y_predicted):
+    sigmasY = get_Ye(y_true)
+    diff = tf.math.subtract(tf.math.asinh(y_predicted), tf.math.asinh(y_true))
+    diff = tf.cast(diff, tf.float64)
+    return tf.reduce_mean(tf.math.divide(tf.square(diff), tf.square(sigmasY)))

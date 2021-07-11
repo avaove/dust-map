@@ -4,6 +4,7 @@ from fixed_bins import get_bin_value_of_pos
 
 # NOTE: X_dataset can be validation or testing coordinates
 def get_pred(X_dataset, model_type, model):
+    # >FIXME NN doesnt work
     '''Return predictions from model
     note: X_dataset (Xo_prime) has taked observed and errors and generated many versions of the possible values based on observed value.
           Its a nested list where sublists are of length 10'''
@@ -38,7 +39,8 @@ def plot_pred_vs_true(X_dataset, Y_dataset, model_type, model, title = 'Intrinsi
     plt.ylim(lims)
     plt.plot(lims, lims)
     plt.title(title)
-    
+
+# >FIXME change function so colour map is between some values: interpolation panels look weird
 def plot_map_panels(X_dataset, Y_dataset, model_type, model):
     '''Creates 3 panel plot showing truth on left, NN in middle and residual on right
     samp is true if X_dataset is an array of samples'''
