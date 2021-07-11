@@ -19,6 +19,7 @@ from keras.optimizers import SGD
 # reproduce results: https://machinelearningmastery.com/reproducible-results-neural-networks-keras/
 import random as rn
 tf.random.set_seed(2021)
+tf.config.run_functions_eagerly(True)
 
 # these modify the default plotting options
 # feel free to ignore these or you can play around with
