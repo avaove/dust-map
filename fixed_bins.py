@@ -3,27 +3,14 @@ from loading_data import *
 from loss_functions import *
 from general_plotting_and_model_prediction import *
 
-# >FIXME remove this function its already in a file -> gives error
-def get_pred(X_dataset, model_type, model):
-    '''Return predictions from model
-    note: X_dataset (Xo_prime) has taked observed and errors and generated many versions of the possible values based on observed value.
-          Its a nested list where sublists are of length 10'''
-    pred = []
-    if model_type == 'NN':
-        X_reshaped = X_dataset.reshape([len(X_dataset), 2]) 
-        pred = np.hstack(model.predict(X_reshaped)) 
-        # reshape back
-        pred = pred.reshape([len(X_dataset), 10, 2])
-    elif model_type == 'interpolate':
-        pred = [model(samplelst[:, 0], samplelst[:, 1]) for samplelst in X_dataset]  #evaluate positions log dust densities
-    elif model_type == 'bin':
-        n_bins = len(model)
-        pred = [[get_bin_value_of_pos(samplelst[i][0], samplelst[i][1], model, abs(BIN_X_MAX - BIN_X_MIN) / n_bins) for i in range(10)] for samplelst in X_dataset]
-    return np.array(pred)
-
+def get_bin_pred(model, Xo_data):
+    '''Return predictions of model when given Xo_data 
+    Xo_data can be Xo_samp_valid, Xo_samp_train, or Xo_samp_test (for a more general purpose)'''
+    n_bins = len(model)
+    return np.array([[get_bin_value_of_pos(samplelst[i][0], samplelst[i][1], model, abs(BIN_X_MAX - BIN_X_MIN) / n_bins) for i in range(10)] for samplelst in Xo_data])
 
 def get_bin_model(n_bins):
-    '''Return bin values matrix'''
+    '''Return bin matrix'''
     n, xbins, ybins = np.histogram2d(Xo_train[:, 0], Xo_train[:, 1],
                                     bins = [np.linspace(BIN_X_MIN, BIN_X_MAX, n_bins + 1), 
                                             np.linspace(BIN_Y_MIN, BIN_Y_MAX, n_bins + 1)])
@@ -32,7 +19,6 @@ def get_bin_model(n_bins):
                                             np.linspace(BIN_Y_MIN, BIN_Y_MAX, n_bins + 1)])
     n = np.where(n == 0, np.nan, n) # to replace 0s with nans: got error for 0/0 (weird)
     avg_mat = s / n
-
     while np.any(np.argwhere(np.isnan(avg_mat))): # keep going until no nan bins
         for i, j in np.argwhere(np.isnan(avg_mat)): #loop over nan indecies
             # horizontal/vertical bins
@@ -56,40 +42,35 @@ def get_bin_model(n_bins):
     return avg_mat
 
 def get_bin_value_of_pos(x, y, avg_mat, bin_len):
-    '''Return bin value of bin point (x,y) falls into
-    X_dataset: position of data
-    Y_dataset: log(dust)'''
+    '''Return bin value of bin point (x,y) falls into'''
     # to get a start from 0 instead of -5
     xo = x - BIN_X_MIN
     yo = y - BIN_Y_MIN
-#     print(xo, yo, len(avg_mat))
     return avg_mat[int(xo / bin_len)][int(yo / bin_len)]
 
-def plot_loss_bin_model(min_bin_num, max_bin_num, X_dataset, Y_dataset, error = False):
-    plt.figure(figsize=(4, 4))
+def plot_loss_bin_model(min_bin_num, max_bin_num, Xo_data, Yo_data, error = False):
     '''Plot how loss changes with increasing number of bins
     Return bin models, lin loss and asinh loss values
     error is True is error measurements are taken into account'''
+    plt.figure(figsize=(4, 4))
     bin_model_lst, loss_lin_vals, loss_asinh_vals = ([] for i in range(3)) 
     bin_nums_lst = range(min_bin_num, max_bin_num) 
-
     for n_bins in bin_nums_lst:
         model = get_bin_model(n_bins) # avg_mat
         bin_model_lst.append(model) 
         # test_pred has (2000, 10) shape for test dataset
-        test_pred = get_pred(X_dataset, 'bin', model) #??? X_dataset changed to Xo_test
+        test_pred = get_bin_pred(model, Xo_data) #??? X_dataset changed to Xo_test
         if (not error): # no error measurements in Y
-            loss_lin_vals.append(loss_lin_np(Y_dataset, test_pred))
-            loss_asinh_vals.append(loss_asinh_np(Y_dataset, test_pred))
+            loss_lin_vals.append(loss_lin_np(Yo_data, test_pred))
+            loss_asinh_vals.append(loss_asinh_np(Yo_data, test_pred))
         else: # error measurements in Y
-            loss_lin_vals.append(loss_lin_er_np(Y_dataset, test_pred))
-            loss_asinh_vals.append(loss_asinh_er_np(Y_dataset, test_pred))
-
+            loss_lin_vals.append(loss_lin_er_np(Yo_data, test_pred))
+            loss_asinh_vals.append(loss_asinh_er_np(Yo_data, test_pred))
     plt.xlabel('Number of bins')
     plt.ylabel('Loss')
     plt.title('Loss over number of bins')
-    plot1, = plt.plot(loss_lin_vals, color = 'red', label='loss lin', linestyle = '-', linewidth = 1, marker = 'D', ms = 2, markeredgecolor='black', markeredgewidth=0.4)
-    plot2, = plt.plot(loss_asinh_vals, color = 'blue', label='loss asinh', linestyle = '-', linewidth = 1, marker = 'D', ms = 2, markeredgecolor='black',markeredgewidth=0.4)
+    plt.plot(loss_lin_vals, color = 'red', label='loss lin', linestyle = '-', linewidth = 1, marker = 'D', ms = 2, markeredgecolor='black', markeredgewidth=0.4)
+    plt.plot(loss_asinh_vals, color = 'blue', label='loss asinh', linestyle = '-', linewidth = 1, marker = 'D', ms = 2, markeredgecolor='black',markeredgewidth=0.4)
     plt.legend()
     plt.grid(True)
     plt.savefig('loss-bins.png')
