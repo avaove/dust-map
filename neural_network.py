@@ -2,6 +2,7 @@ from imports import *
 from loss_functions import *
 from loading_data import *
 import random
+import time
 
 #set of activation functions
 reluAct = ['ReLU', 'Linear'] # using this! works the best
@@ -9,8 +10,8 @@ tanhAct = ['tanh', 'Linear']
 softplusAct = ['Softplus', 'Linear']
 #constant vars
 LR = 0.001
-BATCH_SIZE = 100
-NUM_EPOCHS = 2
+BATCH_SIZE = 10
+NUM_EPOCHS = 100
 NUM_HIDDNEURONS = 256
 STEPS_PER_EPOCH = NUM_TRAIN//BATCH_SIZE
 lr_schedule = tf.keras.optimizers.schedules.InverseTimeDecay(
@@ -18,6 +19,7 @@ lr_schedule = tf.keras.optimizers.schedules.InverseTimeDecay(
   decay_steps=STEPS_PER_EPOCH*20, 
   decay_rate=1, 
   staircase=False)
+optimizer = tf.keras.optimizers.Adam(lr_schedule)
 
 # >FIXME don't know if this works yet
 def plot_NN_loss(train_loss, val_loss, trainLossLabel='loss', valLossLabel='val_loss', title = 'Training vs Validation Loss'):
@@ -30,6 +32,7 @@ def plot_NN_loss(train_loss, val_loss, trainLossLabel='loss', valLossLabel='val_
     plt.grid(True)
     plt.title(title)
 
+@tf.function
 def loss_fn(y_true, y_pred, train=False):
     '''Return loss (for data with error bars in both X and Y)
     note: y_true has shape (BATCH_SIZE) its a batch either from Yo_train or Yo_valid
@@ -53,7 +56,6 @@ def loss_fn(y_true, y_pred, train=False):
 def train_step(x_batch_train, y_batch_train, model):
     '''Return train loss for a training X and Y batch'''
     # open a GradientTape to record the operations run during the forward pass, which enables auto-differentiation
-    optimizer = tf.keras.optimizers.Adam(lr_schedule)
     with tf.GradientTape() as tape:
         # give model() x_batch_train reshaped to (BATCH_SIZE * 10, 2) so model can make logits
         x_batch_train = tf.reshape(x_batch_train, [BATCH_SIZE * 10, 2])
@@ -96,29 +98,42 @@ def get_NN_model():
     
     # fit state of preprocessing layer to data being passed
     # ie. compute mean and variance of the data and store them as the layer weights
-    normalizer = preprocessing.Normalization(input_shape=[2,], dtype='double')
-    normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train])  
-    model = keras.Sequential([normalizer,
-                              keras.layers.Dense(NUM_HIDDNEURONS, activation=reluAct[0].lower()),
-                              keras.layers.Dense(NUM_HIDDNEURONS, activation=reluAct[0].lower()),
-                              keras.layers.Dense(NUM_HIDDNEURONS, activation=reluAct[0].lower()),
-                              keras.layers.Dense(1, activation = reluAct[1].lower())])
+    normalizer = preprocessing.Normalization() #preprocessing.Normalization(input_shape=[2,], dtype='double')
+    normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train])  # ASK  avg for normalizer? 
+    inputs = keras.Input(shape=[2,])
+    x = normalizer(inputs)
+    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_1")(x)
+    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_2")(x)
+    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_3")(x)
+    outputs = layers.Dense(1, name="predictions")(x)
+    model = keras.Model(inputs=inputs, outputs=outputs)
+    # model = keras.Sequential([normalizer,
+    #                           keras.layers.Dense(NUM_HIDDNEURONS, activation=reluAct[0].lower()),
+    #                           keras.layers.Dense(NUM_HIDDNEURONS, activation=reluAct[0].lower()),
+    #                           keras.layers.Dense(NUM_HIDDNEURONS, activation=reluAct[0].lower()),
+    #                           keras.layers.Dense(1, activation = reluAct[1].lower())])
     # list of val loss and train loss data for plotting
     val_loss, train_loss = [], []
     for epoch in range(NUM_EPOCHS):
-        print("\nStart of epoch %d" % (epoch,))
+        start_time = time.time()
+        print("\nStart of epo ch %d" % (epoch,))
+        
         # iterate over batches - note: x_batch_train has shape (BATCH_SIZE * 10 * 2) and y_batch_train has shape (BATCH_SIZE)
         for step, (x_batch_train, y_batch_train) in enumerate(zip(Xo_train_batched, Yo_train_batched)):
             loss_value = train_step(x_batch_train, y_batch_train, model)
-            train_loss.append(loss_value) # save train loss for plotting
+            # appending was here
             # log every 10 batches - note: for training we have 60 batches and for validation we have 20 batches
-            if (step % 10 == 0):
+            # print("STEP: ", step, len(Xo_train_batched), len(Yo_train_batched))
+            if (step % 100 == 0):
                 print("Training loss (for one batch) at step %d: %.4f" % (step, float(loss_value)))
                 print("Seen so far: %s samples" % ((step + 1) * BATCH_SIZE))
         # run validation loop at the end of each epoch.
         for (x_batch_valid, y_batch_valid) in zip(Xo_valid_batched, Yo_valid_batched):
-            loss_value = val_step(x_batch_valid, y_batch_valid, model)
-            val_loss.append(loss_value) # save val loss for plotting
+            val_loss_value = val_step(x_batch_valid, y_batch_valid, model)
+            # appending was here
+        train_loss.append(loss_value) # save train loss for plotting
+        val_loss.append(val_loss_value) # save val loss for plotting
+        print("Time taken: %.2fs" % (time.time() - start_time))
     # >FIXME add defn for test_pred after fixing the speed issue
     # test_pred = get_test_pred(model)
     return train_loss, val_loss #, test_pred

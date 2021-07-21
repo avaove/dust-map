@@ -2,9 +2,9 @@ from imports import *
 
 # load simulated data
 # for now: Xo and Yo are the same as X and Y since we assume we incorporate the errors
-n_data = 10000
+n_data = 1000
 SAMP = True #indicates we are including Xo errors (using samples), set to False otherwise
-data = np.load('logdust_noisy.npz')
+data = np.load('logdust_noisy_1000.npz')
 Xgrid, logdust_grid = data['Xgrid'], data['logdust_grid']
 X_train, X_valid, X_test = data['X_train'], data['X_valid'], data['X_test']
 Xo_train, Xo_valid, Xo_test = data['Xo_train'], data['Xo_valid'], data['Xo_test']
@@ -21,4 +21,4 @@ X_MAX, Y_MAX = 5, 5
 #(this is based on the errors in X, the larger the higher the increment)
 BIN_X_MIN, BIN_X_MAX = X_MIN - 2, X_MAX + 2
 BIN_Y_MIN, BIN_Y_MAX = Y_MIN - 2, Y_MAX + 2
-NUM_TRAIN, NUM_TEST, NUM_VALID = 6000, 2000, 2000
+NUM_TRAIN, NUM_TEST, NUM_VALID = 600, 200, 200

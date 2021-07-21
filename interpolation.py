@@ -1,6 +1,6 @@
 from imports import *
 from loss_functions import *
-from general_plotting_and_model_prediction import *
+from general_plotting import *
 
 def get_interpolation_pred(model, Xo_data):
     '''Return predictions of model when given Xo_data 
