@@ -67,17 +67,3 @@ def loss_asinh_er_np(y_true, y_pred):
         for j in range(10):
             loss += np.divide(np.square(np.subtract(np.arcsinh(y_true[i]), np.arcsinh(y_pred[i][j]))), np.square(sigmasY[i]))
     return loss / len(y_true)
-
-# NOT BEING USED FOR NOW
-# def loss_lin_er_tf(y_true, y_pred):
-#     loss = 0
-#     sigmasY = get_Ye(y_true)
-#     diff = tf.math.subtract(y_true, y_pred)
-#     diff = tf.cast(diff, tf.float64)
-#     return tf.reduce_mean(tf.math.divide(tf.square(diff), tf.square(sigmasY)))
-
-# def loss_asinh_er_tf(y_true, y_predicted):
-#     sigmasY = get_Ye(y_true)
-#     diff = tf.math.subtract(tf.math.asinh(y_predicted), tf.math.asinh(y_true))
-#     diff = tf.cast(diff, tf.float64)
-#     return tf.reduce_mean(tf.math.divide(tf.square(diff), tf.square(sigmasY)))
