@@ -84,7 +84,38 @@ def get_NN_pred(model, Xo_data):
     pred = pred.reshape([len(Xo_data), 10, 2])
     return pred
 
-def get_NN_model(lin_loss=True):
+def get_NN_model(monotonic):
+    '''Return model based on if model is monotonic or not
+    note: kernel_initializer is to initialize weights which are set with mean of 2 and stddev of 1 based on Deep Lattice Network paper: https://slack-files.com/files-pri-safe/T4ATLBXB2-F027ZCKC39R/deep_lattice_networks.pdf?c=1626926313-dc849c3a6e0a6c96'''
+    # fit state of preprocessing layer to data being passed
+    # ie. compute mean and variance of the data and store them as the layer weights
+    normalizer = preprocessing.Normalization() #preprocessing.Normalization(input_shape=[2,], dtype='double')
+    normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train])  # ASK  avg for normalizer? 
+    inputs = keras.Input(shape=[2,])
+    x = normalizer(inputs)
+    # >FIXME make sure all weights are positive after this?
+    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_1")(x) if not monotonic else layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_1", kernel_initializer=my_init(2., 1.))(x)
+    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_2")(x) if not monotonic else layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_1", kernel_initializer=my_init(2., 1.))(x)
+    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_3")(x) if not monotonic else layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_1", kernel_initializer=my_init(2., 1.))(x)
+    outputs = layers.Dense(1, name="predictions")(x) if not monotonic else layers.Dense(1, name="predictions", kernel_initializer=my_init(2., 1.))(x)
+    model = keras.Model(inputs=inputs, outputs=outputs)
+    return model
+
+class my_init(tf.keras.initializers.Initializer):
+    ''' >FIXME add description'''
+    def __init__(self, mean, stddev):
+      self.mean = mean
+      self.stddev = stddev
+
+    def __call__(self, shape, dtype=None):
+        initializers = np.random.normal(self.mean, self.stddev) # get normalized random data with np 
+        initializers = [1e-5 if init<0 else init for init in initializers] # update negative values to positive value 1e-5
+      return tf.convert_to_tensor(initializers) # convert to tensor
+
+    def get_config(self):  # >FIXME ( ASK ??? need this?)To support serialization
+      return {'mean': self.mean, 'stddev': self.stddev}
+
+def train_and_test_NN_model(lin_loss=True, monotonic=True):
     '''Return validation and training loss data over epochs 
     Source: https://www.tensorflow.org/guide/keras/writing_a_training_loop_from_scratch
     set lin_loss to true or false based on if loss function is linear or asinh'''
@@ -96,20 +127,9 @@ def get_NN_model(lin_loss=True):
     Xo_train_batched = tf.data.Dataset.from_tensor_slices([Xo_samp_train[i] for i in train_ind]).batch(BATCH_SIZE)
     Yo_train_batched = tf.data.Dataset.from_tensor_slices([Yo_train[i] for i in train_ind]).batch(BATCH_SIZE)
     Xo_valid_batched = tf.data.Dataset.from_tensor_slices([Xo_samp_valid[i] for i in valid_ind]).batch(BATCH_SIZE)
-    Yo_valid_batched = tf.data.Dataset.from_tensor_slices([Yo_valid[i] for i in valid_ind]).batch(BATCH_SIZE)
-    
-    # fit state of preprocessing layer to data being passed
-    # ie. compute mean and variance of the data and store them as the layer weights
-    normalizer = preprocessing.Normalization() #preprocessing.Normalization(input_shape=[2,], dtype='double')
-    normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train])  # ASK  avg for normalizer? 
-    inputs = keras.Input(shape=[2,])
-    x = normalizer(inputs)
-    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_1")(x)
-    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_2")(x)
-    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_3")(x)
-    outputs = layers.Dense(1, name="predictions")(x)
-    model = keras.Model(inputs=inputs, outputs=outputs)
-    
+    Yo_valid_batched = tf.data.Dataset.from_tensor_slices([Yo_valid[i] for i in valid_ind]).batch(BATCH_SIZE)    
+    model = get_NN_model(monotonic)
+
     # list of val loss and train loss data for plotting
     val_loss, train_loss = [], []
     for epoch in range(NUM_EPOCHS):
