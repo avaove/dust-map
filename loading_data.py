@@ -3,8 +3,8 @@ from imports import *
 # load simulated data
 # for now: Xo and Yo are the same as X and Y since we assume we incorporate the errors
 n_data = 1000
-SAMP = True #indicates we are including Xo errors (using samples), set to False otherwise
-data = np.load('logdust_noisy_1000.npz')
+SAMP = False #indicates we are including Xo errors (using samples), set to False otherwise
+data = np.load('intrinsic_data_integrated_dust.npz')
 Xgrid, logdust_grid = data['Xgrid'], data['logdust_grid']
 X_train, X_valid, X_test = data['X_train'], data['X_valid'], data['X_test']
 Xo_train, Xo_valid, Xo_test = data['Xo_train'], data['Xo_valid'], data['Xo_test']
