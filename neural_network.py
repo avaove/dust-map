@@ -95,8 +95,8 @@ def get_NN_model(monotonic):
     x = normalizer(inputs)
     # >FIXME make sure all weights are positive after this?
     x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_1")(x) if not monotonic else layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_1", kernel_initializer=my_init(2., 1.))(x)
-    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_2")(x) if not monotonic else layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_1", kernel_initializer=my_init(2., 1.))(x)
-    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_3")(x) if not monotonic else layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_1", kernel_initializer=my_init(2., 1.))(x)
+    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_2")(x) if not monotonic else layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_2", kernel_initializer=my_init(2., 1.))(x)
+    x = layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_3")(x) if not monotonic else layers.Dense(NUM_HIDDNEURONS, activation="relu", name="dense_3", kernel_initializer=my_init(2., 1.))(x)
     outputs = layers.Dense(1, name="predictions")(x) if not monotonic else layers.Dense(1, name="predictions", kernel_initializer=my_init(2., 1.))(x)
     model = keras.Model(inputs=inputs, outputs=outputs)
     return model
@@ -108,9 +108,14 @@ class my_init(tf.keras.initializers.Initializer):
       self.stddev = stddev
 
     def __call__(self, shape, dtype=None):
-        initializers = np.random.normal(self.mean, self.stddev) # get normalized random data with np 
-        initializers = [1e-5 if init<0 else init for init in initializers] # update negative values to positive value 1e-5
-      return tf.convert_to_tensor(initializers) # convert to tensor
+        initializers = np.random.normal(self.mean, self.stddev, size=shape) # get normalized random data with np
+        # update negative values to positive value 1e-5 >FIXME make this shorter with list comprehension? 
+        # note: shape of array is not 1D
+        initializers_non_negative = np.zeros(shape,dtype="float32") # tf needs array to be casted to float64
+        for i in range(shape[0]):
+            for j in range(shape[1]):
+                initializers_non_negative[i][j] = 1e-5 if initializers[i][j]<0 else initializers[i][j]        
+        return tf.convert_to_tensor(initializers_non_negative) # convert to tensor
 
     def get_config(self):  # >FIXME ( ASK ??? need this?)To support serialization
       return {'mean': self.mean, 'stddev': self.stddev}
