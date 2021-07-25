@@ -4,7 +4,7 @@ from imports import *
 # for now: Xo and Yo are the same as X and Y since we assume we incorporate the errors
 n_data = 1000
 SAMP = False #indicates we are including Xo errors (using samples), set to False otherwise
-data = np.load('intrinsic_data_integrated_dust.npz')
+data = np.load('datasets/intrinsic_integrated_polar.npz')
 Xgrid, logdust_grid = data['Xgrid'], data['logdust_grid']
 X_train, X_valid, X_test = data['X_train'], data['X_valid'], data['X_test']
 Xo_train, Xo_valid, Xo_test = data['Xo_train'], data['Xo_valid'], data['Xo_test']
