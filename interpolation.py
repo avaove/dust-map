@@ -2,10 +2,14 @@ from imports import *
 from loss_functions import *
 from general_plotting import *
 
-def get_interpolation_pred(model, Xo_data):
+def get_interpolation_pred(model, X_data, error):
     '''Return predictions of model when given Xo_data 
     Xo_data can be Xo_samp_valid, Xo_samp_train, or Xo_samp_test (for a more general purpose)'''
-    return np.array([model(samplelst[:, 0], samplelst[:, 1]) for samplelst in Xo_data])  
+    if error:
+        pred = np.array([model(samplelst[:, 0], samplelst[:, 1]).numpy() for samplelst in X_data]) 
+        return pred_np.reshape([len(X_data), 10])
+    else:
+        return model(Xo_data).numpy()
 
 def plot_interpolate_loss(Xo_data, Yo_data):
     '''Plot loss vs smooth metric (with logarithmic scale)'''
