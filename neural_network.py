@@ -5,19 +5,25 @@ import random
 import time
 
 # set up
-BATCH_SIZE = 100
-EPOCHS = 100
+BATCH_SIZE = 20
+EPOCHS = 200
 HIDDEN_NEURONS = 256
-MIN_MAX_NEURONS = 150000
 STEPS_PER_EPOCH = NUM_TRAIN//BATCH_SIZE
-lr_schedule = tf.keras.optimizers.schedules.InverseTimeDecay(
+lr_schedule1 = tf.keras.optimizers.schedules.InverseTimeDecay(
   0.01, #initial learning rate
   decay_steps=STEPS_PER_EPOCH*20, 
   decay_rate=1, 
   staircase=False)
-optimizer = tf.keras.optimizers.Adam(lr_schedule)
+optimizer1 = tf.keras.optimizers.Adam(lr_schedule1)
+lr_schedule2 = tf.keras.optimizers.schedules.InverseTimeDecay(
+  0.1, #initial learning rate
+  decay_steps=STEPS_PER_EPOCH*100, 
+  decay_rate=1, 
+  staircase=False)
+optimizer2 = tf.keras.optimizers.Adam(lr_schedule2)
 delta_r = 0.01
-MIN_GROUP_SIZE = 5 # should be divisible by MIN_MAX_NEURONS
+MIN_MAX_NEURONS = 7500
+MIN_GROUP_SIZE = 2 # should be divisible by MIN_MAX_NEURONS
 
 
 
@@ -65,7 +71,7 @@ def loss_fn(y_true, y_pred, train=False, error=False):
 
 
 @tf.function
-def train_step(x_batch_train, y_batch_train, model, error=False, num_input=2, monotonic=False):
+def train_step(x_batch_train, y_batch_train, model, error=False, num_input=2, monotonic=False, optimizer=optimizer1):
     '''Return train loss for a training X and Y batch'''
     # open a GradientTape to record the operations run during the forward pass, which enables auto-differentiation
     with tf.GradientTape() as tape:
@@ -161,7 +167,9 @@ def get_partial_min_max_model(num_input=2, error=True):
     inputs = keras.Input(shape=[num_input,]) 
     x = normalizer(inputs)
     # outputs are MIN_MAX_NEURONS lengthed
-    outputs = layers.Dense(MIN_MAX_NEURONS, activation="relu", name="outputs", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
+    # 1.3730
+    # 
+    outputs = layers.Dense(MIN_MAX_NEURONS, activation="softplus", name="outputs", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
     model = keras.Model(inputs=inputs, outputs=outputs)
     return model
 
@@ -178,7 +186,7 @@ def get_min_max_model_predictions(model, x_batch, training):
     return logits_minmax
 
 
-def train_NN_model(monotonic=True, error=False, num_input=2):
+def train_NN_model(monotonic=True, error=False, num_input=2, optimizer=optimizer1):
     '''Return validation and training loss data over epochs 
     Source: https://www.tensorflow.org/guide/keras/writing_a_training_loop_from_scratch'''
     # prepare training and validation sets
@@ -207,7 +215,7 @@ def train_NN_model(monotonic=True, error=False, num_input=2):
         
         # iterate over batches - note: x_batch_train has shape (BATCH_SIZE * 10 * 2) and y_batch_train has shape (BATCH_SIZE)
         for step, (x_batch_train, y_batch_train) in enumerate(zip(X_train_batched, Y_train_batched)):
-            loss_value = train_step(x_batch_train, y_batch_train, model, error=error, num_input=num_input, monotonic=monotonic)
+            loss_value = train_step(x_batch_train, y_batch_train, model, error=error, num_input=num_input, monotonic=monotonic, optimizer=optimizer)
             # appending was here
             # log every 10 batches - note: for training we have 60 batches and for validation we have 20 batches
             # print("STEP: ", step, len(X_train_batched), len(Y_train_batched))

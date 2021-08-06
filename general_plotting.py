@@ -1,7 +1,7 @@
 from imports import *
 from loading_data import *
 from fixed_bins import get_bin_pred
-from neural_network import get_NN_pred
+from neural_network import get_NN_pred, get_min_max_model_predictions
 from interpolation import get_interpolation_pred
 
 def get_pred(Xo_data, model_type, model, error=False):
@@ -9,19 +9,21 @@ def get_pred(Xo_data, model_type, model, error=False):
     pred = []
     if model_type == 'NN':
         return get_NN_pred(model, Xo_data, error)
+    elif model_type == 'min-max':
+        return get_min_max_model_predictions(model, Xo_data, training=False)
     elif model_type == 'interpolate':
         return get_interpolation_pred(model, Xo_data)
     elif model_type == 'bin':
         return get_bin_pred(model, Xo_data)
     return np.array(pred)
 
-def plot_pred_vs_true(Xo_data, Yo_data, model_type, model, title='Intrinsic vs predicted logdust', xlabel='Intrinsic logdust', ylabel='Predicted logdust', error=False):
+def plot_pred_vs_true(Xo_data, Yo_data, pred, title='Intrinsic vs predicted logdust', xlabel='Intrinsic logdust', ylabel='Predicted logdust', error=False):
     '''Plot of NN predictions and intrinsic or uncertain value 
     model_type: 'NN' or 'interpolation or 'bin
     model: NN model, interpolation function, or bin avg matrix'''
-    pred = get_pred(Xo_data, model_type, model, error) # returns nested list. Each sublist is 10 versions of observed X
-    if error:
-        pred = [np.average(x_obs) for x_obs in pred] # get average of 10 samples for each observed pos AND avg over 10 sample predictions
+    # pred = get_pred(Xo_data, model_type, model, error) # returns nested list. Each sublist is 10 versions of observed X
+    # if error:
+    #     pred = [np.average(x_obs) for x_obs in pred] # get average of 10 samples for each observed pos AND avg over 10 sample predictions
     plt.scatter(Yo_data, pred, s=1, color='blue', linestyle='-', linewidth = 0.1, marker = 'D', edgecolor='black') #Yo_test are the actual dust densities of the test x,y points
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -32,14 +34,15 @@ def plot_pred_vs_true(Xo_data, Yo_data, model_type, model, title='Intrinsic vs p
     plt.title(title)
 
 # >FIXME change function so colour map is between some values: interpolation panels look weird
-def plot_map_panels(Xo_data, Yo_data, model_type, model):
+def plot_map_panels(Xo_data, Yo_data, pred, error=False):
     '''Creates 3 panel plot showing truth on left, NN in middle and residual on right
     samp is true if X_dataset is an array of samples'''
-    pred = get_pred(Xo_data, model_type, model)
-    # get average of 10 samples for each observed pos AND avg over 10 sample predictions
-    pred = [np.average(x_obs) for x_obs in pred] 
-    Xo_data = [np.array([np.average(x_samps[:,0]),np.average(x_samps[:,1])]) for x_samps in Xo_data]
-    Xo_data = np.array(Xo_data)
+    # pred = get_pred(Xo_data, model_type, model)
+    # if error:
+    #     # get average of 10 samples for each observed pos AND avg over 10 sample predictions
+    #     pred = [np.average(x_obs) for x_obs in pred] 
+    #     Xo_data = [np.array([np.average(x_samps[:,0]),np.average(x_samps[:,1])]) for x_samps in Xo_data]
+    #     Xo_data = np.array(Xo_data)
     plt.figure(figsize=(20, 5))
     # start plotting
     xlim, ylim = [X_MIN, X_MAX], [Y_MIN, Y_MAX]
