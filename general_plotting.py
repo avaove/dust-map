@@ -6,7 +6,6 @@ from interpolation import get_interpolation_pred
 
 def get_pred(Xo_data, model_type, model, error=False):
     '''Return numpy predictions array of model when given Xo_data by calling appropiate get_pred'''
-    pred = []
     if model_type == 'NN':
         return get_NN_pred(model, Xo_data, error)
     elif model_type == 'min-max':
@@ -15,19 +14,19 @@ def get_pred(Xo_data, model_type, model, error=False):
         return get_interpolation_pred(model, Xo_data)
     elif model_type == 'bin':
         return get_bin_pred(model, Xo_data)
-    return np.array(pred)
 
-def plot_pred_vs_true(Xo_data, Yo_data, pred, title='Intrinsic vs predicted logdust', xlabel='Intrinsic logdust', ylabel='Predicted logdust', error=False):
+def plot_pred_vs_true(Xo_data, Y_data, pred, title='Intrinsic vs predicted', xlabel='Intrinsic logdust', ylabel='Predicted logdust', logData=False, error=False):
     '''Plot of NN predictions and intrinsic or uncertain value 
     model_type: 'NN' or 'interpolation or 'bin
-    model: NN model, interpolation function, or bin avg matrix'''
-    # pred = get_pred(Xo_data, model_type, model, error) # returns nested list. Each sublist is 10 versions of observed X
-    # if error:
-    #     pred = [np.average(x_obs) for x_obs in pred] # get average of 10 samples for each observed pos AND avg over 10 sample predictions
-    plt.scatter(Yo_data, pred, s=1, color='blue', linestyle='-', linewidth = 0.1, marker = 'D', edgecolor='black') #Yo_test are the actual dust densities of the test x,y points
+    model: NN model, interpolation function, or bin avg matrix
+    logData: set to True if plotting log(Y_data) vs log(pred)'''
+    if logData:
+        plt.scatter(Y_data, pred, s=1, color='blue', linestyle='-', linewidth = 0.1, marker = 'D', edgecolor='black') 
+    else:
+        plt.scatter(np.log(Y_data), np.log(pred), s=1, color='blue', linestyle='-', linewidth = 0.1, marker = 'D', edgecolor='black') 
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    lims = [min(np.amin(Yo_data), np.amin(pred)), max(np.amax(Yo_data), np.amax(pred))]
+    lims = [min(np.amin(Y_data), np.amin(pred)), max(np.amax(Y_data), np.amax(pred))]
     plt.xlim(lims)
     plt.ylim(lims)
     plt.plot(lims, lims)

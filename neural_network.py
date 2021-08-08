@@ -5,8 +5,8 @@ import random
 import time
 
 # set up
-BATCH_SIZE = 20
-EPOCHS = 200
+BATCH_SIZE = 50#20
+EPOCHS = 100
 HIDDEN_NEURONS = 256
 STEPS_PER_EPOCH = NUM_TRAIN//BATCH_SIZE
 lr_schedule1 = tf.keras.optimizers.schedules.InverseTimeDecay(
@@ -26,13 +26,10 @@ MIN_MAX_NEURONS = 7500
 MIN_GROUP_SIZE = 2 # should be divisible by MIN_MAX_NEURONS
 
 
-
 def plot_NN_loss(train_loss, val_loss, trainLossLabel='loss', valLossLabel='val_loss', title = 'Training vs Validation Loss'):
     '''Plot val loss and train loss over epochs'''
-    plt.plot(train_loss, label=trainLossLabel, color='blue', linestyle='-', linewidth = 1, 
-             marker = 'o', ms = 2, markeredgecolor='black', markeredgewidth=0.2)
-    plt.plot(val_loss, label=valLossLabel, color='red', linestyle='dashed', linewidth = 1, 
-             marker = 'o', ms = 2, markeredgecolor='black', markeredgewidth=0.2)
+    plt.plot(train_loss, label=trainLossLabel, color='blue', linestyle='-', linewidth = 1, marker = 'o', ms = 2, markeredgecolor='black', markeredgewidth=0.2)
+    plt.plot(val_loss, label=valLossLabel, color='red', linestyle='dashed', linewidth = 1, marker = 'o', ms = 2, markeredgecolor='black', markeredgewidth=0.2)
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
@@ -101,7 +98,8 @@ def get_NN_pred(model, X_data, error=False, num_input=2):
     case error=True: X_data can be Xo_samp_valid, Xo_samp_train, or Xo_samp_test (for a more general purpose)
     case error=False: X_data can be X_valid, X_train, or X_test (for a more general purpose)'''
     if not error:
-        return model(X_data, training=False)
+        pred = model(X_data, training=False).numpy()
+        return pred.reshape([len(X_data)])
     X_data_flattened = X_data.reshape([len(X_data) * 10, num_input]) 
     pred = model(X_data_flattened, training=False)
     pred_np = pred.numpy()
