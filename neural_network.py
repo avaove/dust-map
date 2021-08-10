@@ -6,7 +6,7 @@ import time
 
 # set up
 BATCH_SIZE = 20 # 50
-EPOCHS = 200
+EPOCHS = 60
 HIDDEN_NEURONS = 256
 STEPS_PER_EPOCH = NUM_TRAIN//BATCH_SIZE
 lr_schedule1 = tf.keras.optimizers.schedules.InverseTimeDecay(
