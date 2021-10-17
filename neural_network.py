@@ -24,7 +24,7 @@ optimizer2 = tf.keras.optimizers.Adam(lr_schedule2)
 delta_r = 0.01
 MIN_MAX_NEURONS = 7500
 MIN_GROUP_SIZE = 2 # should be divisible by MIN_MAX_NEURONS
-
+ACTIVATION = "relu"
 
 def plot_NN_loss(train_loss, val_loss, trainLossLabel='loss', valLossLabel='val_loss', title = 'Training vs Validation Loss'):
     '''Plot val loss and train loss over epochs'''
@@ -150,9 +150,9 @@ def get_NN_model(error=False, num_input=2):
     normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train]) if error else normalizer.adapt(X_train)
     inputs = keras.Input(shape=[num_input,]) 
     x = normalizer(inputs)
-    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_1")(x)
-    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_2")(x)
-    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_3")(x)
+    x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_1")(x)
+    x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_2")(x)
+    x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_3")(x)
     # activation is linear if not specified
     outputs = layers.Dense(1, name="predictions")(x)
     model = keras.Model(inputs=inputs, outputs=outputs)
@@ -167,9 +167,9 @@ def get_stricly_monotonic_NN_model(error=False, num_input=2):
     normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train]) if error else normalizer.adapt(X_train)
     inputs = keras.Input(shape=[num_input,]) 
     x = normalizer(inputs)
-    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_1", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
-    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_2", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
-    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_3", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
+    x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_1", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
+    x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_2", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
+    x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_3", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
     # activation is linear if not specified
     outputs = layers.Dense(1, name="predictions", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
     model = keras.Model(inputs=inputs, outputs=outputs)
