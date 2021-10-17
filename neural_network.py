@@ -24,7 +24,8 @@ optimizer2 = tf.keras.optimizers.Adam(lr_schedule2)
 delta_r = 0.01
 MIN_MAX_NEURONS = 7500
 MIN_GROUP_SIZE = 2 # should be divisible by MIN_MAX_NEURONS
-ACTIVATION = "relu"
+ACTIVATION = "gelu" # "relu"
+MODEL_TYPE = "traditional" # "min-max" "strictly-positive-weight" are for previous failed attempts
 
 def plot_NN_loss(train_loss, val_loss, trainLossLabel='loss', valLossLabel='val_loss', title = 'Training vs Validation Loss'):
     '''Plot val loss and train loss over epochs'''
@@ -68,14 +69,17 @@ def loss_fn(y_true, y_pred, train=False, error=False):
 
 
 @tf.function
-def train_step(x_batch_train, y_batch_train, model, error=False, num_input=2, monotonic=False, optimizer=optimizer1):
+def train_step(x_batch_train, y_batch_train, model, error=False, num_input=2, optimizer=optimizer1):
     '''Return train loss for a training X and Y batch'''
     # open a GradientTape to record the operations run during the forward pass, which enables auto-differentiation
     with tf.GradientTape() as tape:
         # give model() x_batch_train if error=False else x_batch_train reshaped to (BATCH_SIZE * 10, num_input) so model can make logits
         if error:
             x_batch_train = tf.reshape(x_batch_train, [BATCH_SIZE * 10, num_input]) 
-        logits = model(x_batch_train, training=True) if not monotonic else get_min_max_model_predictions(model, x_batch_train, training=True)
+        if MODEL_TYPE == "traditional" or MODEL_TYPE == "strictly-positive-weight":
+            logits = model(x_batch_train, training=True)
+        elif MODEL_TYPE == "min-max": 
+            logits = get_min_max_model_predictions(model, x_batch_train, training=True)
         loss_value = loss_fn(y_batch_train, logits, train=True, error=error) # loss value for this minibatch  
     grads = tape.gradient(loss_value, model.trainable_weights)
     optimizer.apply_gradients(zip(grads, model.trainable_weights))
@@ -83,12 +87,14 @@ def train_step(x_batch_train, y_batch_train, model, error=False, num_input=2, mo
 
 
 @tf.function
-def val_step(x_batch_valid, y_batch_valid, model, error=False, num_input=2, monotonic=False):
+def val_step(x_batch_valid, y_batch_valid, model, error=False, num_input=2):
     '''Return loss loss for a validation X and Y batch'''
     if error:
         x_batch_valid = tf.reshape(x_batch_valid, [BATCH_SIZE * 10, num_input]) 
-    # apply min-max layer if monotonicity=True before calculating loss
-    val_logits = model(x_batch_valid, training=False) if not monotonic else get_min_max_model_predictions(model, x_batch_valid, training=False)
+    if MODEL_TYPE == "traditional" or MODEL_TYPE == "strictly-positive-weight":
+        val_logits = model(x_batch_valid, training=False)
+    elif MODEL_TYPE == "min-max": 
+        val_logits = get_min_max_model_predictions(model, x_batch_valid, training=False)
     loss_value = loss_fn(y_batch_valid, val_logits, train=False, error=error) 
     return loss_value
 
@@ -141,7 +147,7 @@ class My_Constraint(tf.keras.constraints.Constraint):
   
 
 def get_NN_model(error=False, num_input=2):
-    '''Return NN model, not monotonic
+    '''Return traditional 3 layered NN
     num_input=2 if (r, theita) is the NN input
     num_input=3 if (r, x/r, y/r) is NN input'''
     # fit state of preprocessing layer to data being passed
@@ -158,8 +164,8 @@ def get_NN_model(error=False, num_input=2):
     model = keras.Model(inputs=inputs, outputs=outputs)
     return model
 
-def get_stricly_monotonic_NN_model(error=False, num_input=2):
-    '''Return strictly monotonic model where weights are strictly positive
+def get_strictly_positive_weight_NN_model(error=False, num_input=2):
+    '''Return strictly positive weight model
     >FIXME FAILED ATTEMPT (explain why)'''
     # fit state of preprocessing layer to data being passed
     # ie. compute mean and variance of the data and store them as the layer weights
@@ -219,9 +225,13 @@ def train_NN_model(monotonic=True, error=False, num_input=2, optimizer=optimizer
     Y_train_batched = tf.data.Dataset.from_tensor_slices([Y_train_data[i] for i in train_ind]).batch(BATCH_SIZE)
     X_valid_batched = tf.data.Dataset.from_tensor_slices([X_valid_data[i] for i in valid_ind]).batch(BATCH_SIZE)
     Y_valid_batched = tf.data.Dataset.from_tensor_slices([Y_valid_data[i] for i in valid_ind]).batch(BATCH_SIZE) 
-    # note: this model doesn't work for monotonicity constraints, use min-max instead and use get_NN_model for non monotonicity
-    # monotonic=True gives a model that does not work for monotonic constraints: read notes for more details   
-    model = get_NN_model(error=error,num_input=num_input) if not monotonic else get_partial_min_max_model(num_input=num_input, error=error)     
+    #model = get_NN_model(error=error,num_input=num_input) if not monotonic else get_partial_min_max_model(num_input=num_input, error=error)  
+    if MODEL_TYPE == "traditional": 
+        model = get_NN_model(error=error,num_input=num_input)
+    elif MODEL_TYPE == "min-max": # FAILED
+        model = get_partial_min_max_model(num_input=num_input, error=error)  
+    elif MODEL_TYPE == "strictly-positive-weight": # FAILED
+        model = get_strictly_positive_weight_NN_model(num_input=num_input, error=error)
         
     # list of val loss and train loss data for plotting
     val_loss, train_loss = [], []
