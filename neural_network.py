@@ -140,28 +140,46 @@ class My_Constraint(tf.keras.constraints.Constraint):
       return tf.convert_to_tensor(w_np)
   
 
-def get_NN_model(monotonic, error=False, num_input=2):
-    '''Return model based on if model is monotonic or not
+def get_NN_model(error=False, num_input=2):
+    '''Return NN model, not monotonic
     num_input=2 if (r, theita) is the NN input
     num_input=3 if (r, x/r, y/r) is NN input'''
     # fit state of preprocessing layer to data being passed
     # ie. compute mean and variance of the data and store them as the layer weights
     normalizer = preprocessing.Normalization() #preprocessing.Normalization(input_shape=[2,], dtype='double')
-    normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train]) if error else normalizer.adapt(X_train)# ASK  avg for normalizer? 
+    normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train]) if error else normalizer.adapt(X_train)
     inputs = keras.Input(shape=[num_input,]) 
     x = normalizer(inputs)
-    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_1")(x) if not monotonic else layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_1", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
-    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_2")(x) if not monotonic else layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_2", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
-    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_3")(x) if not monotonic else layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_3", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
+    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_1")(x)
+    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_2")(x)
+    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_3")(x)
     # activation is linear if not specified
-    outputs = layers.Dense(1, name="predictions")(x) if not monotonic else layers.Dense(1, name="predictions", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
+    outputs = layers.Dense(1, name="predictions")(x)
+    model = keras.Model(inputs=inputs, outputs=outputs)
+    return model
+
+def get_stricly_monotonic_NN_model(error=False, num_input=2):
+    '''Return strictly monotonic model where weights are strictly positive
+    >FIXME FAILED ATTEMPT (explain why)'''
+    # fit state of preprocessing layer to data being passed
+    # ie. compute mean and variance of the data and store them as the layer weights
+    normalizer = preprocessing.Normalization() #preprocessing.Normalization(input_shape=[2,], dtype='double')
+    normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train]) if error else normalizer.adapt(X_train)
+    inputs = keras.Input(shape=[num_input,]) 
+    x = normalizer(inputs)
+    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_1", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
+    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_2", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
+    x = layers.Dense(HIDDEN_NEURONS, activation="relu", name="dense_3", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
+    # activation is linear if not specified
+    outputs = layers.Dense(1, name="predictions", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
     model = keras.Model(inputs=inputs, outputs=outputs)
     return model
 
 def get_partial_min_max_model(num_input=2, error=True):
-    '''Returns 2 layer NN model with input layer of size num_input and output layer of size MIN_MAX_NEURONS '''
+    '''Returns 2 layer NN model with input layer of size num_input and output layer of size MIN_MAX_NEURONS 
+    >FIXME FAILED ATTEMPT (explain why)'''
     normalizer = preprocessing.Normalization() 
-    normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train]) if error else normalizer.adapt(X_train)# ASK  avg for normalizer? 
+    normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train]) if error else normalizer.adapt(X_train)
     inputs = keras.Input(shape=[num_input,]) 
     x = normalizer(inputs)
     # outputs are MIN_MAX_NEURONS lengthed
@@ -203,7 +221,7 @@ def train_NN_model(monotonic=True, error=False, num_input=2, optimizer=optimizer
     Y_valid_batched = tf.data.Dataset.from_tensor_slices([Y_valid_data[i] for i in valid_ind]).batch(BATCH_SIZE) 
     # note: this model doesn't work for monotonicity constraints, use min-max instead and use get_NN_model for non monotonicity
     # monotonic=True gives a model that does not work for monotonic constraints: read notes for more details   
-    model = get_NN_model(monotonic=False, error=error,num_input=num_input) if not monotonic else get_partial_min_max_model(num_input=num_input, error=error)     
+    model = get_NN_model(error=error,num_input=num_input) if not monotonic else get_partial_min_max_model(num_input=num_input, error=error)     
         
     # list of val loss and train loss data for plotting
     val_loss, train_loss = [], []
