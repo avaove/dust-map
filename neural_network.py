@@ -208,7 +208,7 @@ def get_min_max_model_predictions(model, x_batch, training):
     return logits_minmax
 
 
-def train_NN_model(monotonic=True, error=False, num_input=2, optimizer=optimizer1):
+def train_NN_model(error=False, num_input=2, optimizer=optimizer1):
     '''Return validation and training loss data over epochs 
     Source: https://www.tensorflow.org/guide/keras/writing_a_training_loop_from_scratch'''
     # prepare training and validation sets
@@ -241,7 +241,7 @@ def train_NN_model(monotonic=True, error=False, num_input=2, optimizer=optimizer
         
         # iterate over batches - note: x_batch_train has shape (BATCH_SIZE * 10 * 2) and y_batch_train has shape (BATCH_SIZE)
         for step, (x_batch_train, y_batch_train) in enumerate(zip(X_train_batched, Y_train_batched)):
-            loss_value = train_step(x_batch_train, y_batch_train, model, error=error, num_input=num_input, monotonic=monotonic, optimizer=optimizer)
+            loss_value = train_step(x_batch_train, y_batch_train, model, error=error, num_input=num_input, optimizer=optimizer)
             # appending was here
             # log every 10 batches - note: for training we have 60 batches and for validation we have 20 batches
             # print("STEP: ", step, len(X_train_batched), len(Y_train_batched))
@@ -251,7 +251,7 @@ def train_NN_model(monotonic=True, error=False, num_input=2, optimizer=optimizer
                 print("Seen so far: %s samples" % ((step + 1) * BATCH_SIZE))
         # run validation loop at the end of each epoch.
         for (x_batch_valid, y_batch_valid) in zip(X_valid_batched, Y_valid_batched):
-            val_loss_value = val_step(x_batch_valid, y_batch_valid, model, error=error,num_input=num_input, monotonic=monotonic)
+            val_loss_value = val_step(x_batch_valid, y_batch_valid, model, error=error,num_input=num_input)
             # appending was here
         train_loss.append(loss_value) # save train loss for plotting
         val_loss.append(val_loss_value) # save val loss for plotting
