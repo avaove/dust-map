@@ -3,11 +3,13 @@ from loss_functions import *
 from loading_data import *
 import random
 import time
+from sympy import *
 
 # set up
-BATCH_SIZE = 20 # 50
-EPOCHS = 60
-HIDDEN_NEURONS = 256
+BATCH_SIZE = 50 # 50
+EPOCHS = 200
+HIDDEN_LAYERS = 3
+HIDDEN_NEURONS = 512 # 256
 STEPS_PER_EPOCH = NUM_TRAIN//BATCH_SIZE
 lr_schedule1 = tf.keras.optimizers.schedules.InverseTimeDecay(
   0.01, #initial learning rate
@@ -16,8 +18,8 @@ lr_schedule1 = tf.keras.optimizers.schedules.InverseTimeDecay(
   staircase=False)
 optimizer1 = tf.keras.optimizers.Adam(lr_schedule1)
 lr_schedule2 = tf.keras.optimizers.schedules.InverseTimeDecay(
-  0.1, #initial learning rate
-  decay_steps=STEPS_PER_EPOCH*100, 
+  0.01, #initial learning rate
+  decay_steps=STEPS_PER_EPOCH*20, 
   decay_rate=1, 
   staircase=False)
 optimizer2 = tf.keras.optimizers.Adam(lr_schedule2)
@@ -69,7 +71,7 @@ def loss_fn(y_true, y_pred, train=False, error=False):
 
 
 @tf.function
-def train_step(x_batch_train, y_batch_train, model, error=False, num_input=2, optimizer=optimizer1):
+def train_step(x_batch_train, y_batch_train, model, error=False, num_input=2, optimizer=optimizer2):
     '''Return train loss for a training X and Y batch'''
     # open a GradientTape to record the operations run during the forward pass, which enables auto-differentiation
     with tf.GradientTape() as tape:
@@ -160,7 +162,7 @@ def get_NN_model(error=False, num_input=2):
     x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_2")(x)
     x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_3")(x)
     # activation is linear if not specified
-    outputs = layers.Dense(1, name="predictions")(x)
+    outputs = layers.Dense(1, activation=ACTIVATION, name="predictions")(x)
     model = keras.Model(inputs=inputs, outputs=outputs)
     return model
 
@@ -173,9 +175,8 @@ def get_strictly_positive_weight_NN_model(error=False, num_input=2):
     normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train]) if error else normalizer.adapt(X_train)
     inputs = keras.Input(shape=[num_input,]) 
     x = normalizer(inputs)
-    x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_1", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
-    x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_2", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
-    x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_3", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
+    for i in range(HIDDEN_LAYERS):
+        x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_" + str(i + 1), kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
     # activation is linear if not specified
     outputs = layers.Dense(1, name="predictions", kernel_initializer=My_Init(2., 1.), kernel_constraint=My_Constraint())(x)
     model = keras.Model(inputs=inputs, outputs=outputs)
@@ -208,7 +209,7 @@ def get_min_max_model_predictions(model, x_batch, training):
     return logits_minmax
 
 
-def train_NN_model(error=False, num_input=2, optimizer=optimizer1):
+def train_NN_model(error=False, num_input=2, optimizer=optimizer2):
     '''Return validation and training loss data over epochs 
     Source: https://www.tensorflow.org/guide/keras/writing_a_training_loop_from_scratch'''
     # prepare training and validation sets
@@ -259,3 +260,13 @@ def train_NN_model(error=False, num_input=2, optimizer=optimizer1):
     # >FIXME add defn for test_pred after fixing the speed issue
     #test_pred = get_NN_pred(model, Xo_samp_test, error) if error else get_NN_pred(model, X_test, error)
     return model, train_loss, val_loss
+
+def get_intrinsic_dust_with_NN_derivative(model):
+    '''Find instrinsic dust through derivative of neural network'''
+    total_layers = HIDDEN_LAYERS + 2
+    
+    return 0 
+
+
+def get_intrinsic_dust_with_finite_difference():
+    return 0
