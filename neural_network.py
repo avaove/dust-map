@@ -172,7 +172,7 @@ def get_NN_model(error=False, num_input=2):
     # fit state of preprocessing layer to data being passed
     # ie. compute mean and variance of the data and store them as the layer weights
     # preprocessing.Normalization(input_shape=[2,], dtype='double')
-    normalizer = preprocessing.Normalization()
+    normalizer = preprocessing.Normalization(name="norm")
     normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train]
                      ) if error else normalizer.adapt(X_train)
     inputs = keras.Input(shape=[num_input, ])
