@@ -6,8 +6,8 @@ import time
 from sympy import *
 
 # set up
-BATCH_SIZE = 50  # 50
-EPOCHS = 150
+BATCH_SIZE = 100  # 50
+EPOCHS = 100
 HIDDEN_LAYERS = 3
 HIDDEN_NEURONS = 512  # 256
 STEPS_PER_EPOCH = NUM_TRAIN//BATCH_SIZE
