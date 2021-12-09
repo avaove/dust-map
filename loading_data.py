@@ -6,7 +6,7 @@ n_data = 10000
 # indicates we are including Xo errors (using samples), set to False otherwise
 SAMP = False
 data = np.load(
-    'datasets/intrinsic_integrated_polar_with_periodicity_constraint.npz')
+    'datasets/intrinsic_integrated_cartesian.npz')
 Xgrid, logdust_grid = data['Xgrid'], data['logdust_grid']
 X_train, X_valid, X_test = data['X_train'], data['X_valid'], data['X_test']
 Xo_train, Xo_valid, Xo_test = data['Xo_train'], data['Xo_valid'], data['Xo_test']

@@ -7,13 +7,13 @@ from sympy import *
 
 # set up
 BATCH_SIZE = 100  # 50
-EPOCHS = 100
-HIDDEN_LAYERS = 3
+EPOCHS = 100  # 150
+HIDDEN_LAYERS = 3  # 3
 HIDDEN_NEURONS = 512  # 256
 STEPS_PER_EPOCH = NUM_TRAIN//BATCH_SIZE
 lr_schedule1 = tf.keras.optimizers.schedules.InverseTimeDecay(
-    0.01,  # initial learning rate
-    decay_steps=STEPS_PER_EPOCH*20,
+    0.01,  # initial learning rate is 0.01
+    decay_steps=STEPS_PER_EPOCH*20,  # was 20
     decay_rate=1,
     staircase=False)
 optimizer1 = tf.keras.optimizers.Adam(lr_schedule1)
