@@ -1,11 +1,33 @@
 from imports import *
-from loss_functions import *
-from loading_data import *
 import random
 import time
 from sympy import *
 
-# set up
+# reproduce results
+tf.random.set_seed(2021)
+tf.config.run_functions_eagerly(True)
+np.set_printoptions(precision=6, suppress=True)
+
+# load no error data
+data = np.load('datasets/dustattenuation_3d_100samps.npz')
+Xgrid, logdust_grid = data['Xgrid'], data['dustattenuation_grid']
+X_train, X_valid, X_test = data['X_train'], data['X_valid'], data['X_test']
+Y_train, Y_valid, Y_test = data['Y_train'], data['Y_valid'], data['Y_test']
+
+# load error data
+data = np.load('datasets/dustattenuation_3d_err.npz')
+Xgrid, Y_grid = data['Xgrid'], data['Y_grid']  # true positions
+# Xogrid, Yo_grid = data['Xogrid'], data['Yo_grid']  # LATER err positions
+# since the network works with X_train
+# include samples and choose first sample
+X_train, X_valid, X_test = data['Xo_train'][:,
+                                            0], data['Xo_valid'][:, 0], data['Xo_test'][:, 0]
+Y_train, Y_valid, Y_test = data['Yo_train'][:,
+                                            0], data['Yo_valid'][:, 0], data['Yo_test'][:, 0]
+
+# Y_valid etc can be the observed values or the intrinsic based on the parameter error it gets treated appropiately
+
+NUM_TRAIN, NUM_TEST, NUM_VALID = 6000, 2000, 2000
 BATCH_SIZE = 100  # 50
 EPOCHS = 100  # 150
 HIDDEN_LAYERS = 3  # 3
@@ -27,8 +49,9 @@ delta_r = 0.01
 MIN_MAX_NEURONS = 7500
 MIN_GROUP_SIZE = 2  # should be divisible by MIN_MAX_NEURONS
 ACTIVATION = "gelu"  # "relu"
-# "min-max" "strictly-positive-weight" are for previous failed attempts
+# set to "min-max" "strictly-positive-weight" are for previous failed attempts
 MODEL_TYPE = "traditional"
+ERROR = True  # set to true if doing samples
 
 
 def plot_NN_loss(train_loss, val_loss, trainLossLabel='loss', valLossLabel='val_loss', title='Training vs Validation Loss'):
@@ -65,13 +88,13 @@ def loss_fn(y_true, y_pred, train=False, error=False):
     # reshape y_pred to (BATCH_SIZE, 10)
     y_pred = tf.reshape(y_pred, [BATCH_SIZE, 10])
     # set errors to Ye_train or Ye_valid based on flag
-    Ye = Ye_train if train else Ye_valid
+    Y = Y_train if train else Y_valid
     for i in range(BATCH_SIZE):
         for j in range(10):
             # calculate lin or asinh difference
             diff = tf.math.subtract(y_true[i], y_pred[i][j])
             diff = tf.cast(diff, tf.float64)
-            loss += tf.math.divide(tf.square(diff), np.square(Ye[i]))
+            loss += tf.math.divide(tf.square(diff), np.square(Y[i]))
     return loss / (BATCH_SIZE * 10)
 
 
@@ -173,7 +196,7 @@ def get_NN_model(error=False, num_input=2):
     # ie. compute mean and variance of the data and store them as the layer weights
     # preprocessing.Normalization(input_shape=[2,], dtype='double')
     normalizer = preprocessing.Normalization(name="norm")
-    normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train]
+    normalizer.adapt([np.average(x_obs) for x_obs in X_train]
                      ) if error else normalizer.adapt(X_train)
     inputs = keras.Input(shape=[num_input, ])
     x = normalizer(inputs)
@@ -193,7 +216,7 @@ def get_strictly_positive_weight_NN_model(error=False, num_input=2):
     # ie. compute mean and variance of the data and store them as the layer weights
     # preprocessing.Normalization(input_shape=[2,], dtype='double')
     normalizer = preprocessing.Normalization()
-    normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train]
+    normalizer.adapt([np.average(x_obs) for x_obs in X_train]
                      ) if error else normalizer.adapt(X_train)
     inputs = keras.Input(shape=[num_input, ])
     x = normalizer(inputs)
@@ -211,7 +234,7 @@ def get_partial_min_max_model(num_input=2, error=True):
     '''Returns 2 layer NN model with input layer of size num_input and output layer of size MIN_MAX_NEURONS 
     >FIXME FAILED ATTEMPT (explain why)'''
     normalizer = preprocessing.Normalization()
-    normalizer.adapt([np.average(x_obs) for x_obs in Xo_samp_train]
+    normalizer.adapt([np.average(x_obs) for x_obs in X_train]
                      ) if error else normalizer.adapt(X_train)
     inputs = keras.Input(shape=[num_input, ])
     x = normalizer(inputs)
@@ -249,18 +272,14 @@ def train_NN_model(error=False, num_input=2, optimizer=optimizer2):
     random.shuffle(train_ind)
     random.shuffle(valid_ind)
     # choose the correct dataset based on error parameter and batch
-    X_train_data = Xo_samp_train if error else X_train
-    Y_train_data = Yo_train if error else Y_train
-    X_valid_data = Xo_samp_valid if error else X_valid
-    Y_valid_data = Yo_valid if error else Y_valid
     X_train_batched = tf.data.Dataset.from_tensor_slices(
-        [X_train_data[i] for i in train_ind]).batch(BATCH_SIZE)
+        [X_train[i] for i in train_ind]).batch(BATCH_SIZE)
     Y_train_batched = tf.data.Dataset.from_tensor_slices(
-        [Y_train_data[i] for i in train_ind]).batch(BATCH_SIZE)
+        [Y_train[i] for i in train_ind]).batch(BATCH_SIZE)
     X_valid_batched = tf.data.Dataset.from_tensor_slices(
-        [X_valid_data[i] for i in valid_ind]).batch(BATCH_SIZE)
+        [X_valid[i] for i in valid_ind]).batch(BATCH_SIZE)
     Y_valid_batched = tf.data.Dataset.from_tensor_slices(
-        [Y_valid_data[i] for i in valid_ind]).batch(BATCH_SIZE)
+        [Y_valid[i] for i in valid_ind]).batch(BATCH_SIZE)
     #model = get_NN_model(error=error,num_input=num_input) if not monotonic else get_partial_min_max_model(num_input=num_input, error=error)
     if MODEL_TYPE == "traditional":
         model = get_NN_model(error=error, num_input=num_input)
@@ -299,14 +318,3 @@ def train_NN_model(error=False, num_input=2, optimizer=optimizer2):
     # >FIXME add defn for test_pred after fixing the speed issue
     #test_pred = get_NN_pred(model, Xo_samp_test, error) if error else get_NN_pred(model, X_test, error)
     return model, train_loss, val_loss
-
-
-def get_intrinsic_dust_with_NN_derivative(model):
-    '''Find instrinsic dust through derivative of neural network'''
-    total_layers = HIDDEN_LAYERS + 2
-
-    return 0
-
-
-def get_intrinsic_dust_with_finite_difference():
-    return 0
