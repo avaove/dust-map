@@ -8,28 +8,18 @@ tf.random.set_seed(2021)
 tf.config.run_functions_eagerly(True)
 np.set_printoptions(precision=6, suppress=True)
 
-# load no error data
-# data = np.load('datasets/dustattenuation_3d_samps.npz')
-# Xgrid, logdust_grid = data['Xgrid'], data['dustattenuation_grid']
-# X_train, X_valid, X_test = data['X_train'], data['X_valid'], data['X_test']
-# Y_train, Y_valid, Y_test = data['Y_train'], data['Y_valid'], data['Y_test']
-
 # load error data
-data = np.load('datasets/dustattenuation_3d_err.npz')
-Xgrid, Y_grid = data['Xgrid'], data['Y_grid']  # true positions
-# Xogrid, Yo_grid = data['Xogrid'], data['Yo_grid']  # LATER err positions
-# since the network works with X_train
-# include samples and choose first sample
+data = np.load('datasets/dustattenuation_3d_err_10samp.npz')
 X_train, X_valid, X_test = data['Xo_train'], data['Xo_valid'], data['Xo_test']
-# X_train, X_valid, X_test = data['Xo_train'][:,0], data['Xo_valid'][:, 0], data['Xo_test'][:, 0]
 Y_train, Y_valid, Y_test = data['Yo_train'], data['Yo_valid'], data['Yo_test']
+# X_train, X_valid, X_test = data['Xo_train'][:,0], data['Xo_valid'][:, 0], data['Xo_test'][:, 0] # include samples and choose first sample
 # Y_train, Y_valid, Y_test = data['Yo_train'][:,0], data['Yo_valid'][:, 0], data['Yo_test'][:, 0]
 
 # Y_valid etc can be the observed values or the intrinsic based on the parameter error it gets treated appropiately
 
 NUM_TRAIN, NUM_TEST, NUM_VALID = 6000, 2000, 2000
 BATCH_SIZE = 100  # 50
-EPOCHS = 200  # 150
+EPOCHS = 20  # 150
 HIDDEN_LAYERS = 3  # 3
 HIDDEN_NEURONS = 512  # 256
 STEPS_PER_EPOCH = NUM_TRAIN//BATCH_SIZE
@@ -53,7 +43,7 @@ ACTIVATION = "gelu"  # "relu"
 MODEL_TYPE = "traditional"
 ERROR = True  # set to true if doing samples
 A_STD = 0.1   # constant standard dev for NN predictions
-SAMPLE_SIZE = 100
+SAMPLE_SIZE = 10
 
 
 def plot_NN_loss(train_loss, val_loss, trainLossLabel='loss', valLossLabel='val_loss', title='Training vs Validation Loss'):
@@ -99,19 +89,21 @@ def loss_fn(y_true, y_pred, train=False, error=False):
             loss += tf.math.divide(tf.square(diff), np.square(Y[i]))
     return loss / (BATCH_SIZE * SAMPLE_SIZE)
 
+
 @tf.function
 def custom_loss_fn(y_true, y_pred, train=False, error=False):
     '''Assuming we use all samples, mean of normal dist is prediction of NN'''
     y_true = tf.cast(y_true, tf.double)
     y_pred = tf.cast(y_pred, tf.double)
     loss = 0
+    penalty = 2 * tf.math.log(A_STD)
     for i in range(BATCH_SIZE):
         # log sum exp over all samples
         scatter = tf.square((y_true[i] - y_pred[i]) / A_STD)
-        penalty = 2 * tf.math.log(A_STD)
         normalPDF = -0.5 * (tf.cast(scatter, tf.double) + tf.cast(penalty, tf.double)) # discarding constants
-        loss += tf.reduce_logsumexp(normalPDF)
-    return -tf.cast(loss, tf.float64)
+        loss += tf.reduce_logsumexp(normalPDF) / (BATCH_SIZE * SAMPLE_SIZE)
+    return -tf.cast(loss, tf.float64)  #- 0.15746824835887405) * 1/1.1795896435623041
+
 
 @tf.function
 def train_step(x_batch_train, y_batch_train, model, error=False, num_input=2, optimizer=optimizer2):
@@ -120,13 +112,13 @@ def train_step(x_batch_train, y_batch_train, model, error=False, num_input=2, op
     with tf.GradientTape() as tape:
         # give model() x_batch_train if error=False else x_batch_train reshaped to (BATCH_SIZE * SAMPLE_SIZE, num_input) so model can make logits
         if error:
-            x_batch_train = tf.reshape(
-                x_batch_train, [BATCH_SIZE * SAMPLE_SIZE, num_input])
+            x_batch_train = tf.reshape(x_batch_train, [BATCH_SIZE * SAMPLE_SIZE, num_input])
+            
         if MODEL_TYPE == "traditional" or MODEL_TYPE == "strictly-positive-weight":
             logits = model(x_batch_train, training=True)
         elif MODEL_TYPE == "min-max":
-            logits = get_min_max_model_predictions(
-                model, x_batch_train, training=True)
+            logits = get_min_max_model_predictions(model, x_batch_train, training=True)
+
         # reshape the logits before passing to custom_loss_fn if error
         if error:
             logits = tf.reshape(logits, [BATCH_SIZE, SAMPLE_SIZE])
@@ -139,14 +131,15 @@ def train_step(x_batch_train, y_batch_train, model, error=False, num_input=2, op
 
 @tf.function
 def val_step(x_batch_valid, y_batch_valid, model, error=False, num_input=2):
-    '''Return loss loss for a validation X and Y batch'''
+    '''Return validation loss for a validation X and Y batch'''
     if error:
         x_batch_valid = tf.reshape(x_batch_valid, [BATCH_SIZE * SAMPLE_SIZE, num_input])
+
     if MODEL_TYPE == "traditional" or MODEL_TYPE == "strictly-positive-weight":
         val_logits = model(x_batch_valid, training=False)
     elif MODEL_TYPE == "min-max":
-        val_logits = get_min_max_model_predictions(
-            model, x_batch_valid, training=False)
+        val_logits = get_min_max_model_predictions(model, x_batch_valid, training=False)
+
     if error:
         val_logits = tf.reshape(val_logits, [BATCH_SIZE, SAMPLE_SIZE])
     loss_value = custom_loss_fn(y_batch_valid, val_logits, train=False, error=error)
@@ -216,24 +209,27 @@ def get_NN_model(error=False, num_input=2):
     # ie. compute mean and variance of the data and store them as the layer weights
     # preprocessing.Normalization(input_shape=[2,], dtype='double')
     normalizer = preprocessing.Normalization(name="norm")
-    tonormalize = X_train # if no samples 
-    # if error:
-    #     # take average of x, y, z of each sample group
-    #     for sample_group in X_train:
-    #         xnormalize = [np.average(sample_group[:,0]) for sample_group in X_train]
-    #         ynormalize = [np.average(sample_group[:,1]) for sample_group in X_train]
-    #         znormalize = [np.average(sample_group[:,2]) for sample_group in X_train]
-    #         tonormalize = [[x, y, z] for (x, y, z) in zip(xnormalize, ynormalize, znormalize)]
-    if error: # temporary since sol above was too slow
-        tonormalize = data['Xo_train'][:,0]
-    print(np.shape([np.average(x_obs) for x_obs in X_train]), np.shape(X_train))
-    print(np.shape(tonormalize))
+
+    if error:
+        # take average of x, y, z of each sample group
+        xnormalize = [np.average(sample_group[:,0]) for sample_group in X_train]
+        ynormalize = [np.average(sample_group[:,1]) for sample_group in X_train]
+        znormalize = [np.average(sample_group[:,2]) for sample_group in X_train] # (6000, 1)
+        tonormalize = [[x, y, z] for (x, y, z) in zip(xnormalize, ynormalize, znormalize)] #(6000, 3)
+    else:
+        tonormalize = X_train # if no samples 
+
+    # if error: # temporary since sol above was too slow
+    #     tonormalize = data['Xo_train'][:,0]
+
     normalizer.adapt(tonormalize)
+
     inputs = keras.Input(shape=[num_input, ])
     x = normalizer(inputs)
     x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_1")(x)
     x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_2")(x)
     x = layers.Dense(HIDDEN_NEURONS, activation=ACTIVATION, name="dense_3")(x)
+
     # activation is linear if not specified
     outputs = layers.Dense(1, activation=ACTIVATION, name="predictions")(x)
     model = keras.Model(inputs=inputs, outputs=outputs)
@@ -298,19 +294,14 @@ def train_NN_model(error=False, num_input=2, optimizer=optimizer2):
     Source: https://www.tensorflow.org/guide/keras/writing_a_training_loop_from_scratch'''
     # prepare training and validation sets
     # shuffle validation and training indecies to randomize batching for Xo and Yo
-    train_ind, valid_ind = [i for i in range(NUM_TRAIN)], [i for i in range(
-        NUM_VALID)]  # to get same shuffle indecies for X and Y
+    train_ind, valid_ind = [i for i in range(NUM_TRAIN)], [i for i in range(NUM_VALID)]  # to get same shuffle indecies for X and Y
     random.shuffle(train_ind)
     random.shuffle(valid_ind)
     # choose the correct dataset based on error parameter and batch
-    X_train_batched = tf.data.Dataset.from_tensor_slices(
-        [X_train[i] for i in train_ind]).batch(BATCH_SIZE)
-    Y_train_batched = tf.data.Dataset.from_tensor_slices(
-        [Y_train[i] for i in train_ind]).batch(BATCH_SIZE)
-    X_valid_batched = tf.data.Dataset.from_tensor_slices(
-        [X_valid[i] for i in valid_ind]).batch(BATCH_SIZE)
-    Y_valid_batched = tf.data.Dataset.from_tensor_slices(
-        [Y_valid[i] for i in valid_ind]).batch(BATCH_SIZE)
+    X_train_batched = tf.data.Dataset.from_tensor_slices([X_train[i] for i in train_ind]).batch(BATCH_SIZE) # batch_size, 6000, 3
+    Y_train_batched = tf.data.Dataset.from_tensor_slices([Y_train[i] for i in train_ind]).batch(BATCH_SIZE)
+    X_valid_batched = tf.data.Dataset.from_tensor_slices([X_valid[i] for i in valid_ind]).batch(BATCH_SIZE)
+    Y_valid_batched = tf.data.Dataset.from_tensor_slices([Y_valid[i] for i in valid_ind]).batch(BATCH_SIZE)
     #model = get_NN_model(error=error,num_input=num_input) if not monotonic else get_partial_min_max_model(num_input=num_input, error=error)
     if MODEL_TYPE == "traditional":
         model = get_NN_model(error=error, num_input=num_input)
